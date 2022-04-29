@@ -1,75 +1,69 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import scipy as sp
+from sklearn.mixture import GaussianMixture
 
+"""
+We'll build our DP-GMM implementation off of sklearn's GaussianMixture class.
+"""
 
-class GMM(object):
+"""
+D : original dataset
+D' : neighbor dataset of D
+d : number of dimensions
+n : number of records
+x_i : ith record in D
+K : number of Gaussian components
+T : maximum iterations
+B : total privacy budget
+pi, mu_k, sigma_k : original parameters in each iteration
+S(pi), S(mu), S(sigma): L_1-sensitivity of pi, mu_k, sigma_k
+pi_bar, mu_bar_k, sigma_bar_k : noisy parameters in each iteration
+pi_hat, sigma_hat_k : 
+"""
 
-    def __init__(self, n_components, max_iter=100, comp_names=None):
-        self._n_components = n_components
-        self._max_iter = max_iter
-        if not comp_names:
-            self._comp_names = [f"comp{i}" for i in range(n_components)]
-        else:
-            self._comp_names = comp_names
-        self.pi = [1/n_components for _ in range(n_components)]
+class GMM(GaussianMixture):
 
-    @property
-    def n_components(self):
-        return self._n_components
-    
-    @property
-    def max_iter(self):
-        return self._max_iter
-    
-    @property
-    def comp_names(self):
-        return self._comp_names
-    
-    def multivariate_normal(self, X, mean_vector, covariance_matrix):
-        return (2*np.pi)**(-len(X)/2)*np.linalg.det(covariance_matrix)**(-1/2)*np.exp(-np.dot(np.dot((X-mean_vector).T, np.linalg.inv(covariance_matrix)), (X-mean_vector))/2)
+    def fit(self, X, y=None):
+        """Estimate model parameters with the EM algorithm.
 
-    def fit(self, X):
-        # Spliting the data in n_components sub-sets
-        new_X = np.array_split(X, self.n_components)
-        # Initial computation of the mean-vector and covarience matrix
-        self.mean_vector = [np.mean(x, axis=0) for x in new_X]
-        self.covariance_matrixes = [np.cov(x.T) for x in new_X]
-        # Deleting the new_X matrix because we will not need it anymore
-        del new_X
-        for _ in range(self.max_iter):
-            ''' --------------------------   E - STEP   -------------------------- '''
-            # Initiating the r matrix, evrey row contains the probabilities
-            # for every cluster for this row
-            self.r = np.zeros((len(X), self.n_components))
-            # Calculating the r matrix
-            for n in range(len(X)):
-                for k in range(self.n_components):
-                    self.r[n][k] = self.pi[k] * self.multivariate_normal(X[n], self.mean_vector[k], self.covariance_matrixes[k])
-                    self.r[n][k] /= sum([self.pi[j]*self.multivariate_normal(X[n], self.mean_vector[j], self.covariance_matrixes[j]) for j in range(self.n_components)])
-            # Calculating the N
-            N = np.sum(self.r, axis=0)
-            ''' --------------------------   M - STEP   -------------------------- '''
-            # Initializing the mean vector as a zero vector
-            self.mean_vector = np.zeros((self.n_components, len(X[0])))
-            # Updating the mean vector
-            for k in range(self.n_components):
-                for n in range(len(X)):
-                    self.mean_vector[k] += self.r[n][k] * X[n]
-            self.mean_vector = [1/N[k]*self.mean_vector[k] for k in range(self.n_components)]
-            # Initiating the list of the covariance matrixes
-            self.covariance_matrixes = [np.zeros((len(X[0]), len(X[0]))) for k in range(self.n_components)]
-            # Updating the covariance matrices
-            for k in range(self.n_components):
-                self.covariance_matrixes[k] = np.cov(X.T, aweights=(self.r[:, k]), ddof=0)
-            self.covariance_matrixes = [1/N[k]*self.covariance_matrixes[k] for k in range(self.n_components)]
-            # Updating the pi list
-            self.pi = [N[k]/len(X) for k in range(self.n_components)]
+        The method fits the model ``n_init`` times and sets the parameters with
+        which the model has the largest likelihood or lower bound. Within each
+        trial, the method iterates between E-step and M-step for ``max_iter``
+        times until the change of likelihood or lower bound is less than
+        ``tol``, otherwise, a ``ConvergenceWarning`` is raised.
+        If ``warm_start`` is ``True``, then ``n_init`` is ignored and a single
+        initialization is performed upon the first call. Upon consecutive
+        calls, training starts where it left off.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            List of n_features-dimensional data points. Each row
+            corresponds to a single data point.
+        y : Ignored
+            Not used, present for API consistency by convention.
         
-    def predict(self, X):
-        probas = []
-        for n in range(len(X)):
-            probas.append([self.multivariate_normal(X[n], self.mean_vector[k], self.covariance_matrixes[k])
-                           for k in range(self.n_components)])
-        cluster = []
-        for proba in probas:
-            cluster.append(self.comp_names[proba.index(max(proba))])
-        return cluster
+        Returns
+        -------
+        self : object
+            The fitted mixture.
+        """
+        self._X = X
+        self._trained = True
+        self.fit_predict(X, y)
+        return self
+
+    def plot_mixture(self, bins=10):
+        if not self._trained:
+            raise RuntimeError("GMM has not been fitted yet, see `fit` method.")
+        if self._X.shape[-1] > 1:
+            raise ValueError("too many dimensions to plot (expected 1)")
+        _, bin_vals, _ = plt.hist(self._X, bins=bins, density=True, color="gray", alpha=0.5)
+        xvals = np.linspace(bin_vals[0], bin_vals[-1], 100)
+        for i in range(self.n_components):
+            pi = self.weights_[i]
+            pdf = sp.stats.norm(self.means_.flatten()[i], self.covariances_.flatten()[i]**0.5).pdf(xvals)
+            plt.plot(xvals, pi*pdf, label=f"Component {i + 1}")
+        plt.legend()
+        plt.show()
