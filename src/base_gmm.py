@@ -7,21 +7,6 @@ from sklearn.mixture import GaussianMixture
 We'll build our DP-GMM implementation off of sklearn's GaussianMixture class.
 """
 
-"""
-D : original dataset
-D' : neighbor dataset of D
-d : number of dimensions
-n : number of records
-x_i : ith record in D
-K : number of Gaussian components
-T : maximum iterations
-B : total privacy budget
-pi, mu_k, sigma_k : original parameters in each iteration
-S(pi), S(mu), S(sigma): L_1-sensitivity of pi, mu_k, sigma_k
-pi_bar, mu_bar_k, sigma_bar_k : noisy parameters in each iteration
-pi_hat, sigma_hat_k : 
-"""
-
 class GMM(GaussianMixture):
 
     def __init__(
