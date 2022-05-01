@@ -7,16 +7,12 @@ Created on Sat Apr 30 12:10:24 2022
 """
 
 import numpy as np
-import warnings
-from base_gmm import GMM
-from sklearn.utils import check_random_state
-from sklearn.exceptions import ConvergenceWarning
 import matplotlib.pyplot as plt
 import scipy as sp
 import pandas as pd
 from ldp_gmm import LDPGMM
 
-df = pd.read_csv('/Users/jeffreymayolo/Library/CloudStorage/OneDrive-HarvardUniversity/Harvard_Academics/2022-2/CS208/final_project/DP-GMM/data/old_faithful.csv')
+df = pd.read_csv("../data/old_faithful.csv")
 faith_gmm = LDPGMM(n_components = 2)
 faith_gmm.fit(np.array(df['waiting']).reshape(-1,1))
 faith_gmm.plot_mixture(bins = 20)

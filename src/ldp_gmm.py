@@ -7,11 +7,7 @@ Created on Sat Apr 30 11:34:50 2022
 """
 
 import numpy as np
-import warnings
 from base_gmm import GMM
-from sklearn.utils import check_random_state
-from sklearn.exceptions import ConvergenceWarning
-import mock_dp_library as dpl
 import local_dist as ld
 
 class LDPGMM(GMM):
@@ -62,8 +58,7 @@ class LDPGMM(GMM):
         if epsilon <= 0:
             raise ValueError("ValueError: invalid epsilon, must be greater than 0")
         self._epsilon = epsilon
-    
-        
+      
     def fit_ldp(self, X, y = None, boots = 2000):
         
         # Define Local parameters based off data
@@ -81,5 +76,3 @@ class LDPGMM(GMM):
         self.fit(dp_list.reshape(-1,1))
         
         return self
-        
-        
