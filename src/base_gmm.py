@@ -95,9 +95,9 @@ class GMM(GaussianMixture):
             the dataset has a dimention higher than 1
         """
         if not self._trained:
-            raise RuntimeError("RuntimeError: GMM has not been fit to any data, see `fit` method.")
+            raise RuntimeError("GMM has not been fit to any data, see `fit` method.")
         if self._X.shape[-1] > 1:
-            raise ValueError("ValueError: too many dimensions to plot (expected 1)")
+            raise ValueError("too many dimensions to plot (expected 1)")
         _, bin_vals, _ = plt.hist(self._X, bins=bins, density=True, color="gray", alpha=0.5)
         xvals = np.linspace(bin_vals[0], bin_vals[-1], 100)
         for i in range(self.n_components):
