@@ -14,6 +14,7 @@ from sklearn.utils import check_random_state
 from sklearn.exceptions import ConvergenceWarning
 import mock_dp_library as dpl
 
+# Local release function used in class
 def local_release(x, epsilon):
     x = np.array(x)
 
@@ -23,11 +24,9 @@ def local_release(x, epsilon):
 
     return x
 
-def num_flipped(x):
-    return sum(x==-1)
-
 # Define function to release local histogram
 def local_histogram_release(x, bounds, epsilon, bins):
+    
     lower, upper = bounds
     
     x_clamped = dpl.clamp(x, bounds)
@@ -45,10 +44,15 @@ def local_histogram_release(x, bounds, epsilon, bins):
     
     return dp_release
 
+
+
 # Define function to make local histogram release from 
 def convert_to_hist(n, bounds, data, epsilon, bins, boots, plot = False):
     
+    # Bootstrap the data
     boot_data = dpl.bootstrap(data, n=boots)
+    
+    #Create local histogram of proportions
     dp_hist = local_histogram_release(x=boot_data, bounds=bounds, epsilon=epsilon, bins=bins) 
     
     raw_dp_values = dp_hist.mean(axis=0) 
