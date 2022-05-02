@@ -3,6 +3,10 @@ import warnings
 from base_gmm import GMM
 from sklearn.utils import check_random_state
 from sklearn.exceptions import ConvergenceWarning
+from sklearn import cluster
+from diffprivlib.models import KMeans
+from diffprivlib.validation import check_bounds, clip_to_bounds
+from diffprivlib.utils import PrivacyLeakWarning
 
 
 """
@@ -23,6 +27,7 @@ eps_p, eps_m, eps_s : privacy budget of pi, mu_k, and sigma_k
 
 
 class CDPGMM(GMM):
+    # TODO: add class docstring, reference We et al. and Holohan et al.
 
     def __init__(
         self,
@@ -60,20 +65,93 @@ class CDPGMM(GMM):
             verbose_interval=verbose_interval
         )
         self._epsilon = epsilon
+        # allocate privacy budget
+        self._eps_init = 0.1 * epsilon                             # privacy budget for parameter initialization
+        self._eps_p = (0.04 * epsilon) / max_iter                  # privacy budget for weights
+        self._eps_m = (0.16 * epsilon) / (max_iter * n_components) # privacy budget for means
+        self._eps_s = (0.7 * epsilon) / (max_iter * n_components)  # privacy budget for covariances
     
     @property
     def epsilon(self):
         return self._epsilon
-    
+
     @epsilon.setter
     def epsilon(self, epsilon):
         if epsilon <= 0:
-            raise ValueError("ValueError: invalid epsilon, must be greater than 0")
+            raise ValueError("invalid epsilon, must be greater than 0")
         self._epsilon = epsilon
-    
+        self._eps_p = (0.04 * epsilon) / self.max_iter
+        self._eps_m = (0.16 * epsilon) / (self.max_iter * self.n_components)
+        self._eps_s = (0.7 * epsilon) / (self.max_iter * self.n_components)
 
-    def fit_predict(self, X, y=None):
-        # TODO: add information about DP in docstring
+    def _initialize_parameters(self, X, bounds):
+        # TODO: add information about DP and bounds parameter in docstring
+        """Initialize the model parameters.
+
+        Parameters
+        ----------
+        X : array-like of shape  (n_samples, n_features)
+        random_state : RandomState
+            A random number generator instance that controls the random seed
+            used for the method chosen to initialize the parameters.
+        """
+        n_samples, _ = X.shape
+
+        if self.init_params == "kmeans":
+            resp = np.zeros((n_samples, self.n_components))
+            label = (
+                KMeans(
+                    n_clusters=self.n_components, epsilon=self._eps_init, bounds=bounds
+                )
+                .fit(X)
+                .labels_
+            )
+            resp[np.arange(n_samples), label] = 1
+        else:
+            raise ValueError(
+                "Unimplemented initialization method '%s'" % self.init_params
+            )
+        self._initialize(X, resp)
+    
+    def fit(self, X, y=None, bounds=None):
+        # TODO: add information about DP and bounds parameter in docstring
+        """Estimate model parameters with the EM algorithm.
+        The method fits the model ``n_init`` times and sets the parameters with
+        which the model has the largest likelihood or lower bound. Within each
+        trial, the method iterates between E-step and M-step for ``max_iter``
+        times until the change of likelihood or lower bound is less than
+        ``tol``, otherwise, a ``ConvergenceWarning`` is raised.
+        If ``warm_start`` is ``True``, then ``n_init`` is ignored and a single
+        initialization is performed upon the first call. Upon consecutive
+        calls, training starts where it left off.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            List of n_features-dimensional data points. Each row
+            corresponds to a single data point.
+        y : Ignored
+            Not used, present for API consistency by convention.
+        Returns
+        -------
+        self : object
+            The fitted mixture.
+        """
+        self._X = X
+        self._trained = True
+        _, n_dims = X.shape
+        if not bounds:
+            warnings.warn("Bounds have not been specified and will be calculated on the data provided.  This will "
+                          "result in additional privacy leakage. To ensure differential privacy and no additional "
+                          "privacy leakage, specify `bounds` for each dimension.", PrivacyLeakWarning)
+            bounds = (np.min(X, axis=0), np.max(X, axis=0))
+
+        bounds = check_bounds(bounds, n_dims, min_separation=1e-5)
+        X = clip_to_bounds(X, bounds)
+        self.fit_predict(X, y, bounds)
+        return self
+
+    def fit_predict(self, X, y=None, bounds=None):
+        # TODO: add information about DP and bounds parameter in docstring
         """Estimate model parameters using X and predict the labels for X.
 
         The method fits the model n_init times and sets the parameters with
@@ -119,7 +197,7 @@ class CDPGMM(GMM):
             self._print_verbose_msg_init_beg(init)
 
             if do_init:
-                self._initialize_parameters(X, random_state)
+                self._initialize_parameters(X, bounds)
 
             lower_bound = -np.inf if do_init else self.lower_bound_
 
@@ -132,8 +210,16 @@ class CDPGMM(GMM):
 
                     log_prob_norm, log_resp = self._e_step(X)
                     self._m_step(X, log_resp)
+                    # TODO:
+                    #   add noise to weights according to Eq. (7)
+                    #   for k = 1 to K do
+                    #       add noise to means according to Eq. (8)
+                    #       add noise to covariances according to Eq. (9)
+                    #   normalize weights
+                    #   for k = 1 to K do
+                    #       post-process covariances using Algorith 1
                     lower_bound = self._compute_lower_bound(log_resp, log_prob_norm)
-                    # TODO: add in noise and post-processing steps
+                    
 
                     change = lower_bound - prev_lower_bound
                     self._print_verbose_msg_iter_end(n_iter, change)
