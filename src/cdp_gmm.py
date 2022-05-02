@@ -1,12 +1,13 @@
 import numpy as np
 import warnings
-from base_gmm import GMM
 from sklearn.utils import check_random_state
 from sklearn.exceptions import ConvergenceWarning
-from sklearn import cluster
 from diffprivlib.models import KMeans
 from diffprivlib.validation import check_bounds, clip_to_bounds
 from diffprivlib.utils import PrivacyLeakWarning
+
+import mock_dp_library as dpl
+from base_gmm import GMM
 
 
 """
@@ -18,6 +19,7 @@ x_i : ith record in D
 K : number of Gaussian components
 T : maximum iterations
 B : total privacy budget
+R : upper bound L_1-norm of x_i
 pi, mu_k, sigma_k : original parameters in each iteration
 S(pi), S(mu), S(sigma): L_1-sensitivity of pi, mu_k, sigma_k
 pi_bar, mu_bar_k, sigma_bar_k : noisy parameters in each iteration
@@ -143,11 +145,11 @@ class CDPGMM(GMM):
             warnings.warn("Bounds have not been specified and will be calculated on the data provided.  This will "
                           "result in additional privacy leakage. To ensure differential privacy and no additional "
                           "privacy leakage, specify `bounds` for each dimension.", PrivacyLeakWarning)
-            bounds = (np.min(X, axis=0), np.max(X, axis=0))
+            self.bounds = (np.min(X, axis=0), np.max(X, axis=0))
 
-        bounds = check_bounds(bounds, n_dims, min_separation=1e-5)
-        X = clip_to_bounds(X, bounds)
-        self.fit_predict(X, y, bounds)
+        self.bounds = check_bounds(self.bounds, n_dims, min_separation=1e-5)
+        X = clip_to_bounds(X, self.bounds)
+        self.fit_predict(X, y, self.bounds)
         return self
 
     def fit_predict(self, X, y=None, bounds=None):
@@ -210,16 +212,12 @@ class CDPGMM(GMM):
 
                     log_prob_norm, log_resp = self._e_step(X)
                     self._m_step(X, log_resp)
-                    # TODO:
-                    #   add noise to weights according to Eq. (7)
-                    #   for k = 1 to K do
-                    #       add noise to means according to Eq. (8)
-                    #       add noise to covariances according to Eq. (9)
-                    #   normalize weights
-                    #   for k = 1 to K do
-                    #       post-process covariances using Algorith 1
-                    lower_bound = self._compute_lower_bound(log_resp, log_prob_norm)
-                    
+
+                    # DP steps here
+                    self._noise_step(X)
+                    self._post_process_step()
+
+                    lower_bound = self._compute_lower_bound(log_resp, log_prob_norm)                    
 
                     change = lower_bound - prev_lower_bound
                     self._print_verbose_msg_iter_end(n_iter, change)
@@ -257,3 +255,39 @@ class CDPGMM(GMM):
         _, log_resp = self._e_step(X)
 
         return log_resp.argmax(axis=1)
+    
+    def _noise_step(self, X):
+        # TODO: add docstring
+        #   add noise to weights according to Eq. (7)
+        #   for k = 1 to K do
+        #       add noise to means according to Eq. (8)
+        #       add noise to covariances according to Eq. (9)
+        n, d = X.shape
+        K = self.n_components
+        R = np.linalg.norm(X, ord=1, axis=1).max()
+
+        # Calculate sensitivities
+        #   weights: S(pi) = K/n
+        #   means: S(mu) = 4RK/n
+        #   covariances: S(sigma) = (12nKR^2 + 8K^2R^2)/n^2        
+        sens_p = K / n
+        sens_m = (4 * R * K) / n
+        sens_s = (12 * n * K * R**2 + 8 * K**2 * R**2) / (n**2)
+
+        # add noise to 
+        self.weights_ += dpl.laplace(shift=0, scale=(sens_p / self._eps_p), size=self.weights_.shape)
+        for k in range(K):
+            # add noise to means matrix
+            means_noise = dpl.laplace(shift=0, scale=(sens_m / self._eps_m), size=self.means_[k].shape)
+            self.means_[k] += means_noise
+            # add symmetric noise to covariance matrix
+            cov_noise = dpl.laplace(shift=0, scale=(sens_s / self._eps_s), size=self.covariances_[k].shape)
+            cov_noise = np.tril(cov_noise) + np.tril(cov_noise, -1).T
+            self.covariances_[k] += cov_noise
+
+    def _post_process_step(self):
+        # TODO: add docstring
+        #   normalize weights
+        #   for k = 1 to K do
+        #       post-process covariances using Algorith 1
+        raise NotImplementedError
