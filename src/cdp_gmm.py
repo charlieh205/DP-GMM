@@ -213,9 +213,15 @@ class CDPGMM(GMM):
                     log_prob_norm, log_resp = self._e_step(X)
                     self._m_step(X, log_resp)
 
+                    print(self.weights_)
+                    print(type(self.weights_))
+
                     # DP steps here
                     self._noise_step(X)
+                    print(self.weights_)
                     self._post_process_step()
+                    print(self.weights_)
+                    exit()
 
                     lower_bound = self._compute_lower_bound(log_resp, log_prob_norm)                    
 
@@ -274,7 +280,7 @@ class CDPGMM(GMM):
         sens_m = (4 * R * K) / n
         sens_s = (12 * n * K * R**2 + 8 * K**2 * R**2) / (n**2)
 
-        # add noise to 
+        # add noise to weights
         self.weights_ += dpl.laplace(shift=0, scale=(sens_p / self._eps_p), size=self.weights_.shape)
         for k in range(K):
             # add noise to means matrix
@@ -289,5 +295,11 @@ class CDPGMM(GMM):
         # TODO: add docstring
         #   normalize weights
         #   for k = 1 to K do
-        #       post-process covariances using Algorith 1
-        raise NotImplementedError
+        #       post-process covariances using Algorithm 1
+        # TODO: figure out normalizing weights (currently possible to
+        #       get negative weights after noise)
+        self.weights_ /= self.weights_.sum()
+        for k in range(self.n_components):
+            min_eig = np.linalg.eigvals(self.covariances_[k]).min()
+            delt = max(0, -1*min_eig)
+            self.covariances_[k] += delt * np.identity(n = self.covariances_[k].shape[0])
