@@ -50,10 +50,10 @@ def local_histogram_release(x, bounds, epsilon, bins):
 def convert_to_hist(n, bounds, data, epsilon, bins, boots, plot = False):
     
     # Bootstrap the data
-    boot_data = dpl.bootstrap(data, n=boots)
+    #boot_data = dpl.bootstrap(data, n=boots)
     
     #Create local histogram of proportions
-    dp_hist = local_histogram_release(x=boot_data, bounds=bounds, epsilon=epsilon, bins=bins) 
+    dp_hist = local_histogram_release(x=data, bounds=bounds, epsilon=epsilon, bins=bins) 
     
     raw_dp_values = dp_hist.mean(axis=0) 
     c = (np.exp(epsilon/2) + 1)/(np.exp(epsilon/2) - 1)
@@ -75,7 +75,14 @@ def convert_to_hist(n, bounds, data, epsilon, bins, boots, plot = False):
 def make_dist(corrected_props, data):
     
     # Convert proportions to values
-    vals = (corrected_props+1)*len(data)/2
+    vals = []
+    for val in corrected_props:
+        if val<0:
+            vals.append((val+1)*len(data)/2)
+        else:
+            vals.append(0)
+    #vals = (corrected_props+1)*len(data)/2
+    vals = np.array(vals)
     
     # Clip to 0 and the max to get rid of negative values
     vals = np.clip(vals, 0, max(vals))
