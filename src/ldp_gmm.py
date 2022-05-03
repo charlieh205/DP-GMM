@@ -63,6 +63,7 @@ class LDPGMM(GMM):
         
         # Define Local parameters based off data
         n = len(X)
+        # TODO: add bounds warning
         bounds = (min(X), max(X))
         bins = list(np.unique(X))
         
