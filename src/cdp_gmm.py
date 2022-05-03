@@ -96,6 +96,8 @@ class CDPGMM(GMM):
                           "result in additional privacy leakage. To ensure differential privacy and no additional "
                           "privacy leakage, specify `bounds` for each dimension.", PrivacyLeakWarning)
             self.bounds = (np.min(X, axis=0), np.max(X, axis=0))
+        else:
+            self.bounds = bounds
 
         self.bounds = check_bounds(self.bounds, n_dims, min_separation=1e-5)
         X = clip_to_bounds(X, self.bounds)
