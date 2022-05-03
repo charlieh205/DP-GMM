@@ -75,7 +75,7 @@ class GMM(GaussianMixture):
         self.fit_predict(X, y)
         return self
 
-    def plot_mixture(self, bins=10):
+    def plot_mixture(self, bins=10, figsize=(10, 5)):
         """Plot the mixture model on top of the data.
 
         The method is only designed for datasets of single dimension. A
@@ -86,6 +86,8 @@ class GMM(GaussianMixture):
         ----------
         bins : int, optional
             number of equal-width bins, by default 10
+        figsize : tuple, optional
+            size of figure, by default (10, 5)
 
         Raises
         ------
@@ -98,6 +100,7 @@ class GMM(GaussianMixture):
             raise RuntimeError("GMM has not been fit to any data, see `fit` method.")
         if self._X.shape[-1] > 1:
             raise ValueError("too many dimensions to plot (expected 1)")
+        plt.figure(figsize=figsize)
         _, bin_vals, _ = plt.hist(self._X, bins=bins, density=True, color="gray", alpha=0.5)
         xvals = np.linspace(bin_vals[0], bin_vals[-1], 100)
         for i in range(self.n_components):
