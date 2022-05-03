@@ -89,7 +89,6 @@ class CDPGMM(GMM):
         self : object
             The fitted mixture.
         """
-        self._X = X
         self._trained = True
         _, n_dims = X.shape
         if not bounds:
