@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Apr 30 11:34:50 2022
-
-@author: jeffreymayolo
-"""
-
 import numpy as np
 from base_gmm import GMM
 import local_dist as ld

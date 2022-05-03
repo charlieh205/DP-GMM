@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Apr 30 12:25:48 2022
-
-@author: jeffreymayolo
-"""
-
 import numpy as np
 import pandas as pd
 import warnings
