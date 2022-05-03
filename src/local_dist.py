@@ -1,9 +1,5 @@
 import numpy as np
 import pandas as pd
-import warnings
-from base_gmm import GMM
-from sklearn.utils import check_random_state
-from sklearn.exceptions import ConvergenceWarning
 import mock_dp_library as dpl
 
 # Local release function used in class
